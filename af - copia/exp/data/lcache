@@ -1,0 +1,15 @@
+{"name": "build_exp", "frequency": "0/0", "description": "[red]build[/red] a exp into a [red]shell[/red] command. The exp behaviour will still the same", "type": "building", "color": "violet"}
+{"name": "cleantemp", "frequency": "0/0", "description": "[red]clean[/red] some window's temporal files", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "del", "frequency": "0/0", "description": "[red]deletes[/red] a file or folder permanently", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "encrypt", "frequency": "0/0", "description": "[red]encrypts[/red] a file or folder or raw data, with keys, or with whatever especified method", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "esexp", "frequency": "0/0", "description": "[red]deletes[/red] a built version of an exp", "type": "building", "color": "violet"}
+{"name": "example", "frequency": "0/0", "description": "test, prints the argv", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "explorerat", "frequency": "0/0", "description": "[red]opens[/red] the windows file explorer at a certain directory", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "install_dependencies", "frequency": "0/0", "description": "[red]install[/red] all the dependencies for any exp", "type": "building", "color": "violet"}
+{"name": "list", "frequency": "0/0", "description": "[red]list[/red] all the loaded exp", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "ls", "frequency": "0/0", "description": "[red]provides[/red] various utilities at reading file properties", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "recl", "frequency": "0/0", "description": "[red]opens[/red] the lastest avaible version of runexp at interactive mode", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "rei", "frequency": "0/0", "description": "NONE", "type": "UNKNOWN", "color": "white"}
+{"name": "runexp", "frequency": "0/0", "description": "[red]runs[/red] an exp, can run exp commands", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "touch", "frequency": "0/0", "description": "[red]provides[/red] various utilities at writing file properties", "type": "utils", "color": "dark_slate_gray1"}
+{"name": "view", "frequency": "0/0", "description": "lets you [red]read[/red] a file content", "type": "utils", "color": "dark_slate_gray1"}
