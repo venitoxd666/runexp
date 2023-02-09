@@ -74,7 +74,7 @@ class InputHandler(object):
         fr = self.runexp.freq
         rec = ""
         
-        state = [3]
+        state = []
         
         def _erase_rec():
             self.buff.write("\b \b" * len(rec))
