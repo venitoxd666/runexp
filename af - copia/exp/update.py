@@ -39,14 +39,19 @@ def _update(expname):
     sys.stdout.write("[%s]" % (" " * 100))
     sys.stdout.flush()
     sys.stdout.write("\b" * (100+1)) # return to start of line, after '['
-    step = len(req.text) / 100 + 1
+    step = len(req.text)//100 + 1
     with open(os.path.join(af_path(), expname + '.py'), 'w') as f:
-        for indx, c in enumerate(req.text):
-            if(indx % step == 0):
+        for index, char in enumerate(req.text):
+            if(index % step == 0):
                 sys.stdout.write("-")
                 sys.stdout.flush()
-            f.write(c)
-    sys.stdout.write("]\n")
+            try:
+                if(char == '\r'):
+                    continue
+                f.write(char)
+            except KeyboardInterrupt:
+                pass
+    sys.stdout.write("\n")
 
 def main():
     if ((len(sys.argv) != 2)):
