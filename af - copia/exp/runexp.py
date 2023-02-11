@@ -135,18 +135,8 @@ class InputHandler(object):
             if (char == b'\t' and rec):
                 _erase_rec()
                 buffer += rec
-                try:
-                    st = state[-1]
-                except IndexError:
-                    st = 0
-                if not(st):
-                    self.buff.write(rec)
-                elif(st == 1):
-                    self._print_colored(rec, 'red')
-                elif(st == 2):
-                    self._print_colored(rec, 'green')
-                elif(st == 3):
-                    self._print_colored(rec, 'blue')      
+                self.buff.write(rec)
+                self.buff.flush()
                 continue
             if (char == b'\x08'):
                 if not len(buffer):
