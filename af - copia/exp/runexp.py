@@ -284,7 +284,7 @@ class RunExp(object):
         cmd = 'cd '
 
         for obj in os.listdir(self.cd):
-            if(obj.startswith(first)):
+            if(obj.startswith(first)) and os.path.isdir(os.path.join(self.cd, obj)):
                 cmd += obj
                 break
     
