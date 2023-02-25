@@ -93,9 +93,11 @@ class InputHandler(object):
                 self._print_rec(rec)
             char = msvcrt.getch()
             if(char == b'\x18'):
+                # Ctrl + X
                 self.buff.write("^X")
                 return "exit"
             if(char==b'\x1a'):
+                # Ctrl + Z
                 return "cls"
             if(char == b"\xe0"):
                 char = msvcrt.getch()
@@ -293,7 +295,10 @@ class RunExp(object):
     def get_recomendations(self, filtered, command):
         if(command == ''):
             return filtered, ""
-        if(self.split_command(command)[0] == 'cd'):
+        rec = self.split_command(command)
+        if(len(rec) == 0):
+            rec = ['']
+        if(rec[0] == 'cd'):
             return self.recomend_cd(filtered, command)
         order = []
         for cmd in filtered:
