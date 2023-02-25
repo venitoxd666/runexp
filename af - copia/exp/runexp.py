@@ -276,14 +276,24 @@ class RunExp(object):
         for obj in order:
             if(len(obj['cmd'])/len(command) >= 0.4):
                 new_filtered[obj['cmd']] = obj['freq']
+        
+        _cmd = command[2:]
+        spaces = 0
+        if(len(_cmd) == 0):
+            spaces = 1
+        else:
+            while(_cmd[spaces] == ' '):
+                spaces += 1
+                if(spaces >= len(_cmd)):
+                    break
             
         command = self.split_command(command)
-        
+                
         command = command[1:] if len(command) > 1 else []
 
         first = command[0] if command else ""
 
-        cmd = 'cd '
+        cmd = 'cd' + ' '*spaces
 
         for obj in os.listdir(self.cd):
             if(obj.startswith(first)) and os.path.isdir(os.path.join(self.cd, obj)):
