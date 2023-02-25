@@ -67,6 +67,11 @@ class InputHandler(object):
 
     def _substract(self,a, b):
         return a[len(b):]
+    
+    def _length(self, buffer:str):
+        tablength = 8
+        
+        return len(buffer) + (tablength - 1) * buffer.count('\t')
 
     def input(self, prompt = ""):
         buffer = ""
@@ -87,11 +92,16 @@ class InputHandler(object):
             if(rec):
                 self._print_rec(rec)
             char = msvcrt.getch()
+            if(char == b'\x18'):
+                self.buff.write("^X")
+                return "exit"
+            if(char==b'\x1a'):
+                return "cls"
             if(char == b"\xe0"):
                 char = msvcrt.getch()
                 if(char == b'H'):
                     _erase_rec()
-                    self.buff.write("\b \b" * len(buffer))
+                    self.buff.write("\b \b" * self._length(buffer))
                     try:
                         buffer = runexp.command_registry[-(cindex + 1)]
                     except IndexError:
@@ -105,7 +115,7 @@ class InputHandler(object):
                     continue
                 if(char == b'P'):
                     _erase_rec()
-                    self.buff.write("\b \b" * len(buffer))
+                    self.buff.write("\b \b" * self._length(buffer))
                     try:
                         buffer = runexp.command_registry[-(cindex)]
                     except IndexError:
@@ -125,9 +135,12 @@ class InputHandler(object):
                 break
             if(char == b'\x16'):
                 _erase_rec()
-                self.buff.write("\b \b" * len(buffer))
+                self.buff.write("\b \b" * self._length(buffer))
                 win32clipboard.OpenClipboard()
-                buffer = win32clipboard.GetClipboardData()
+                try:
+                    buffer = win32clipboard.GetClipboardData()
+                except TypeError:
+                    buffer = ""
                 win32clipboard.CloseClipboard()
                 self.buff.write(buffer)
                 self.buff.flush()
@@ -141,13 +154,20 @@ class InputHandler(object):
             if (char == b'\x08'):
                 if not len(buffer):
                     continue
-                buffer = buffer[:-1]  
+                a = buffer[-1]
+                buffer = buffer[:-1]
                 _erase_rec()
-                self.buff.write("\b \b")
+                length = 1
+                if(a == '\t'):
+                    length = 8
+                self.buff.write("\b \b" * length)
                 self.buff.flush()
                 continue
             try:
-                char = char.decode()
+                if(char == b'\xa4'):
+                    char = 'ñ'
+                else:
+                    char = char.decode()
             except Exception as e:
                 char = chr(char[0])
             buffer += char
@@ -243,9 +263,38 @@ class RunExp(object):
     def _argv(self,argv):
         return argv[1:] if len(argv) >= 2 else []
     
+    def recomend_cd(self, filtered, command):
+        order = []
+        for cmd in filtered:
+            if not(cmd.startswith(command)):
+                continue
+            order.append({"cmd":cmd, "freq":filtered[cmd]})
+
+        new_filtered = {}
+        for obj in order:
+            if(len(obj['cmd'])/len(command) >= 0.4):
+                new_filtered[obj['cmd']] = obj['freq']
+            
+        command = self.split_command(command)
+        
+        command = command[1:] if len(command) > 1 else []
+
+        first = command[0] if command else ""
+
+        cmd = 'cd '
+
+        for obj in os.listdir(self.cd):
+            if(obj.startswith(first)):
+                cmd += obj
+                break
+    
+        return new_filtered, cmd
+ 
     def get_recomendations(self, filtered, command):
         if(command == ''):
             return filtered, ""
+        if(self.split_command(command)[0] == 'cd'):
+            return self.recomend_cd(filtered, command)
         order = []
         for cmd in filtered:
             if not(cmd.startswith(command)):
@@ -255,7 +304,6 @@ class RunExp(object):
         for obj in order:
             if(len(obj['cmd'])/len(command) >= 0.4):
                 new_filtered[obj['cmd']] = obj['freq']
-
 
         best = {"cmd":"", "freq":0}
         for cmd in new_filtered:
