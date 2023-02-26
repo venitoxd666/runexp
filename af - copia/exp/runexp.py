@@ -94,7 +94,7 @@ class InputHandler(object):
             char = msvcrt.getch()
             if(char == b'\x18'):
                 # Ctrl + X
-                self.buff.write("^X")
+                self.buff.write("^X\n")
                 return "exit"
             if(char==b'\x1a'):
                 # Ctrl + Z
@@ -137,14 +137,14 @@ class InputHandler(object):
                 break
             if(char == b'\x16'):
                 _erase_rec()
-                self.buff.write("\b \b" * self._length(buffer))
                 win32clipboard.OpenClipboard()
                 try:
-                    buffer = win32clipboard.GetClipboardData()
+                    clipboard = win32clipboard.GetClipboardData()
                 except TypeError:
-                    buffer = ""
+                    blipboard = ""
                 win32clipboard.CloseClipboard()
-                self.buff.write(buffer)
+                buffer += clipboard
+                self.buff.write(clipboard)
                 self.buff.flush()
                 continue
             if (char == b'\t' and rec):
@@ -291,15 +291,25 @@ class RunExp(object):
                 
         command = command[1:] if len(command) > 1 else []
 
-        first = command[0] if command else ""
+        first = " ".join(command)
 
         cmd = 'cd' + ' '*spaces
+        path = self.cd
+        f = first
 
-        for obj in os.listdir(self.cd):
-            if(obj.startswith(first)) and os.path.isdir(os.path.join(self.cd, obj)):
+        if('/' in first):
+            a = os.path.join(*os.path.split(first)[:-1]), os.path.split(first)[-1]
+            a, f = a
+            path = os.path.join(self.cd, a)
+            cmd += a + '/'
+            
+        posible = os.listdir(path)
+        posible.append('LOCAL')
+        for obj in posible:
+            if(obj.startswith(f)) and (os.path.isdir(os.path.join(path, obj)) or obj == 'LOCAL'):
                 cmd += obj
-                break
-    
+                break  
+        
         return new_filtered, cmd
  
     def get_recomendations(self, filtered, command):
