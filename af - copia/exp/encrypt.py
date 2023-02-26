@@ -2,9 +2,10 @@
 # import win32api
 import os
 import sys
-import io
+import io, time
 # import win32crypt
 # import win32file
+import threading
 import argparse
 import rich
 import random
@@ -55,47 +56,26 @@ ap.print_help = print_help
 def _INT_NOT(i, numbits=8):
     return (1 << numbits) - 1 - i
 
-class BTree(object):
-    def __init__(self, vl, f):
-        self.value = vl
-        self.freq = f
-        self.left = self.right = None
+class Diagram(object):
+    def __init__(self, value,):
+        self.value = value
+        self.children = []
+        self.parent = None
 
 class Huffman(object):
     def __init__(self, buffer):
         self.buffer = buffer
-        self.heap = []
-
-    def __lt__(self, other):
-        return self.frequency < other.frequency
-
-    def __eq__(self, other):
-        return self.frequency == other.frequency
-
-    def _compute_freqs(self):
-        freq = {}
-        char = self.buffer.read(1)
-        while(char):
-            if not(char in freq):
-                freq[char] = 0
-            freq[char] += 1
-            char = self.buffer.read(1)
-
-        return freq
-
-    def build_heap(self, f):
-        for key in f:
-            cf = f[key]
-            byntree_node = BTree(key, cf)
-            heapq.heappush(self.heap, byntree_node)
-
+    
     def compute(self):
-        self.buffer.seek(0)
-        frqd = self._compute_freqs()
-        self.heap = self.build_heap(frqd)
-
+        pass
+    
     def decrypt(self):
         pass
+
+
+def req_ps(method):
+    method.requires_password = True
+    return method
 
 class Encrypter(object):
     def __init__(self, opts):
@@ -108,6 +88,14 @@ class Encrypter(object):
         
         self.directory = self.opts.directory
         self.file = self.opts.file
+        if not(self.file):
+            self.file = []
+            if not(self.directory):
+                raise ValueError("Expected or file (\"-f FILE\") or directory (\"-d DIRECTORY\")")
+            for dir in self.directory:
+                for root, _, files in os.walk(dir):
+                    for file in files:
+                        self.file.append(os.path.join(root, file))
         self.directory = self.opts.directory
         
         if not(self.opts.method):
@@ -126,15 +114,14 @@ class Encrypter(object):
             char = read_buffer.read(1)
         return res
     
+    @req_ps
     def ntg(self, read_buffer):
         res = io.BytesIO()
         char = read_buffer.read(1)
         password = self.opts.password
         if not(password):
-            password = self.need_password("Enter password (Enter to random):")        
-            if not(password):
-                password = random.randint(0, 255)
-                rich.print(f"Generated password is : {password}")
+            password = random.randint(0, 255)
+            rich.print(f"Generated password is : {password}")
         if(self.opts.password):
             if not(self.opts.password.isdigit()):
                 self.error("Password for ntg must be a integer positive number", 0x1)
@@ -166,8 +153,8 @@ class Encrypter(object):
             self.opts.password = askpass(prompt,mask=self.opts.mask)           
         return self.opts.password
 
+    @req_ps
     def ntg_decrypt(self, read_buffer):
-        self.opts.password = self.need_password()
         if not(self.opts.password.isdigit()):
             self.error("Password for ntg must be a integer positive number", 0x1)
         password = int(self.opts.password)
@@ -200,19 +187,22 @@ class Encrypter(object):
     def huffman_decrypt(self, read_buffer):
         return Huffman(read_buffer).decrypt()
 
-    # keep working functionality    
-    def encrypt(self, method, file, output):
+    # keep working functionality
+    def encrypt(self, method, file, output,stop):
         file = open(file, 'rb')
-        if not(hasattr(self, method)):
-            self.error(f"Invalid method: {method}",1)
-        method = getattr(self, method)
         try:
+            if(stop()):
+                return
             output_buffer = method(file)
         except Exception as e:
-            print(e)
             self.error(f"Invalid method: {method}",1)
         file.close()
+        if(stop()):
+            return
+
         with open(output, 'wb') as file:
+            if(stop()):
+                return
             file.write(output_buffer.getvalue())
         
     def error(self, msg, errno):
@@ -225,33 +215,43 @@ class Encrypter(object):
         while(1):
             yield None
 
-    def decrypt(self, method, file, output):
-        file = open(file, 'rb')
-        method = method + '_decrypt'
-        if not(hasattr(self, method)):
-            self.error(f"Invalid method: {method}",1,'big')
-        method = getattr(self, method)
-        output_buffer = method(file)
-        file.close()
-        with open(output, 'wb') as file:
-            file.write(output_buffer.getvalue())
-
-    def decrypt_run(self):
-        for file, output in zip(self.file, self._output_stream()):
-            output = output or file
-
-            self.decrypt(self.method, file, output)
-
     def run(self):
         if(self.opts.dercrypt):
-            return self.decrypt_run()
-        
+            self.method = self.method + '_decrypt'
+
+        if not(hasattr(self, self.method)):
+            self.error(f"Invalid method: {self.method}",1)
+
+        method = getattr(self, self.method)
+
+        if(getattr(method,'requires_password',False)):
+            self.need_password()
+
+        chars = '|/-\\'
+        stop_thread = 0
+        kill_thread = lambda : stop_thread
         for file, output in zip(self.file, self._output_stream()):
             output = output or file
-
-            self.encrypt(self.method, file, output)
+            thread = threading.Thread(target=self.encrypt, args=(method, file,output, kill_thread))
+            thread.daemon = True
+            state = 0
+            thread.start()
+            text = ""
+            sys.stdout.write("\n")
+            while(thread.is_alive()):
+                try:
+                    char = chars[state % len(chars)]
+                    text = f'[{char}] - {file} >> {output} '
+                    sys.stdout.write("\033[F" + text)
+                    sys.stdout.flush()
+                    time.sleep(0.2)
+                    state += 1
+                except KeyboardInterrupt:
+                    sys.stdout.write("\n")
+                    return sys.exit(1)
+        
+        sys.stdout.write("\n")
 
 if __name__ == "__main__":
     opts = ap.parse_args()
     Encrypter(opts).run()
-    
