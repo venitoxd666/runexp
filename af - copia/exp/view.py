@@ -1,5 +1,44 @@
-import rich
+import rich,builtins
+import os
 import sys
+
+
+def equals(obj1, obj2):
+    equals_chars = 0
+    bigger_comparison = max(len(obj1), len(obj2))
+
+    def get(obj, index):
+        if(index >= len(obj)):
+            return ""
+        return obj[index]
+
+    for i in range(bigger_comparison):
+        equals_chars += (get(obj1, i) == get(obj2, i))
+
+    return equals_chars/bigger_comparison
+
+def open(*a ,**k):
+    try:
+        return builtins.open(*a,**k)
+    except Exception as e:
+        file = a[0]
+        if(os.path.isdir(file)):
+            rich.print(f"[red]ERROR[/red]: Cannot open Directories. ({file} is a directory)")
+            sys.exit(1)
+        
+        basepath, file = os.path.dirname(file), os.path.split(file)[-1]
+        basepath = os.path.join(os.getcwd(), basepath)
+
+        for fl in os.listdir(basepath):
+            if(os.path.isdir(os.path.join(basepath, fl))):
+                continue
+            
+            if(equals(fl, file) >= 0.85):
+                rich.print(f"[red]ERROR[/red]: Cannot open file {file}. ¿Did you mean {fl}?")
+                sys.exit(1)
+
+        rich.print(f"[red]ERROR[/red]: Could not open file: {file}")            
+        sys.exit(1)
 
 HELP = """
 Usage: view FILE
@@ -71,7 +110,8 @@ def hex_view(file):
 
 def view(argv):
     global COLS
-    hexview = False    
+    hexview = False
+        
     if('-c' in argv):
         i = argv.index('-c') + 1
         if i >= len(argv) or not(argv[i].isdigit()):
@@ -107,6 +147,14 @@ def view(argv):
                 char = f.read(1)
 
             rich.print(result)
+            return 0
+        elif(argv[0] == 'nocolor'):
+            file = argv[1]
+            f = (open(file, 'r'))
+            chunk = f.read(COLS)
+            while(chunk):
+                sys.stdout.write(chunk)
+                chunk = f.read(COLS)
             return 0
         else:
             file = argv[0]
