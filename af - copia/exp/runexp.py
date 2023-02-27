@@ -13,7 +13,7 @@ DEBUG = False
 RUNEXP_HELP = """
 \[Usage]: runexp [[yellow]-h[/yellow]] [[yellow]-nc[/yellow]][[yellow]-e[/yellow]] [[yellow]--isexp[/yellow]] [[yellow]-c[/yellow]] [green]programName[/green] [[yellow]argument0[/yellow],[[yellow]argument1[/yellow],[yellow]...[/yellow]]]
 
-[red]Version  [/red]: [green]1.3.0[/green]
+[red]Version  [/red]: [green]1.3.1[/green]
 [red]Changelog[/red]:
    [yellow]1.0.0[/yellow]: basic runexp behaviour
    [yellow]1.1.0[/yellow]: added "-c" option and "-h" option. Bug found searching for exp programs
@@ -30,11 +30,12 @@ RUNEXP_HELP = """
         [yellow]1.2.10[/yellow]: Reworked code, "-nc" added (experimental)
         [yellow]1.2.11[/yellow]: Added support for Up arrow to go to the last command.
     [yellow]1.3.0[/yellow]: Mayor input improvements. ( Input coloring (beta),autocompletition)
+        [yellow]1.3.1[/yellow]: Added Additional shortcuts
 
 BUGS:
+    · Tab may be represented incorrectly when need to be erased or
+        when moving through the command buffer
     · argument order may generate problems
-    · CD with ./Something does not work.
-    · CTRL + C may cause a crash.
 
 Options:
   [yellow]-h[/yellow]            Show this help message and exit
@@ -52,12 +53,25 @@ run:
     [red]--isexp[/red]       prints if the following program is a exp command or a shell command and executes it.
     [red]--history[/red]     prints execution history.
     [red]-nc[/red]           supress coloring.
+Shortcuts:
+    Ctrl-[red]V[/red] will copy the text in clipboard if any         (append to the command, not overwrite it)
+    Ctrl-[red]Z[/red] will clean the window                          (does not erase the command)
+    Ctrl-[red]X[/red] will exit the interactive shell mode           (obviously erases the command)
+    Ctrl-[red]Y[/red] will open the explorer at the current location (does not erase the command)
 """
 
 class InputHandler(object):
     def __init__(self, runexp):
         self.runexp = runexp    
         self.buff = sys.stdout
+        self._exit_buffer = ""
+
+    def getch(self):
+        if len(self._exit_buffer):
+            last_char = self._exit_buffer[-1]
+            self._exit_buffer = self._exit_buffer[:-1]
+            return int.to_bytes(last_char, 1, 'big')
+        return msvcrt.getch()
 
     def write(self, *a):
         self.buff.write(*a)
@@ -96,14 +110,23 @@ class InputHandler(object):
                 # Ctrl + X
                 self.buff.write("^X\n")
                 return "exit"
+            if(char ==b'\x19'):
+                self.runexp.exec_from_command("explorerat .")
+                continue
             if(char==b'\x1a'):
                 # Ctrl + Z
-                return "cls"
+                self.runexp.exec_from_command("cls")
+                self.buff.write(prompt)
+                self.buff.write(buffer)
+                self.buff.write(rec)
+                self.buff.flush()
+                continue
+
             if(char == b"\xe0"):
                 char = msvcrt.getch()
                 if(char == b'H'):
                     _erase_rec()
-                    self.buff.write("\b \b" * self._length(buffer))
+                    self.buff.write("\b \b" * (self._length(buffer) - 1))
                     try:
                         buffer = runexp.command_registry[-(cindex + 1)]
                     except IndexError:
@@ -117,7 +140,7 @@ class InputHandler(object):
                     continue
                 if(char == b'P'):
                     _erase_rec()
-                    self.buff.write("\b \b" * self._length(buffer))
+                    self.buff.write("\b \b" * (self._length(buffer) - 1))
                     try:
                         buffer = runexp.command_registry[-(cindex)]
                     except IndexError:
@@ -141,7 +164,7 @@ class InputHandler(object):
                 try:
                     clipboard = win32clipboard.GetClipboardData()
                 except TypeError:
-                    blipboard = ""
+                    clipboard = ""
                 win32clipboard.CloseClipboard()
                 buffer += clipboard
                 self.buff.write(clipboard)
@@ -206,7 +229,7 @@ class InputHandler(object):
                 elif(st == 3):
                     self._print_colored(char, 'blue')                    
             self.buff.flush()
-        
+        _erase_rec()
         self.buff.write("\n")
         self.buff.flush()
         return buffer
@@ -302,8 +325,10 @@ class RunExp(object):
             a, f = a
             path = os.path.join(self.cd, a)
             cmd += a + '/'
-            
-        posible = os.listdir(path)
+        try:
+            posible = os.listdir(path)
+        except Exception as e:
+            posible = []
         posible.append('LOCAL')
         for obj in posible:
             if(obj.startswith(f)) and (os.path.isdir(os.path.join(path, obj)) or obj == 'LOCAL'):
@@ -343,6 +368,18 @@ class RunExp(object):
             return
         self.freq[cmd] = 1
     
+    def exec_from_command(self, command):
+        command_split = self.split_command(command)
+        if not(len(command_split)):
+            return 1
+            
+        self.command_registry.append(command)
+        self.upd_freq(command)
+    
+        self.execute_command(command_split,command_split,command)
+        return 0
+        
+    
     def interactive(self):
         last_ki = 0
         while(isinstance(self.interactive_run,bool)):
@@ -356,16 +393,9 @@ class RunExp(object):
                 continue
             
             last_ki = 0
-    
-            command_split = self.split_command(command)
-            if not(len(command_split)):
+            if(self.exec_from_command(command)):
                 continue
-            
-            self.command_registry.append(command)
-            self.upd_freq(command)
-    
-            self.execute_command(command_split,command_split,command)
-            
+
         errno = self.interactive_run
         self.interactive_run = True
         return errno
