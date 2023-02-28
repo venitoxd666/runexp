@@ -58,6 +58,7 @@ Shortcuts:
     Ctrl-[red]Z[/red] will clean the window                          (does not erase the command)
     Ctrl-[red]X[/red] will exit the interactive shell mode           (obviously erases the command)
     Ctrl-[red]Y[/red] will open the explorer at the current location (does not erase the command)
+    Ctrl-[red]Q[/red] go to the parent directory if any              (does not erase the command)
 """
 
 class InputHandler(object):
@@ -121,12 +122,20 @@ class InputHandler(object):
                 self.buff.write(rec)
                 self.buff.flush()
                 continue
+            if(char==b'\x11'):
+                self.runexp.exec_from_command("cd ..")
+                self.buff.write("\n")
+                self.buff.write(self.runexp.prompt())
+                self.buff.write(buffer)
+                self.buff.write(rec)
+                self.buff.flush()                
+                continue
 
             if(char == b"\xe0"):
                 char = msvcrt.getch()
                 if(char == b'H'):
                     _erase_rec()
-                    self.buff.write("\b \b" * (self._length(buffer) - 1))
+                    self.buff.write("\b \b" * (self._length(buffer)))
                     try:
                         buffer = runexp.command_registry[-(cindex + 1)]
                     except IndexError:
@@ -140,7 +149,7 @@ class InputHandler(object):
                     continue
                 if(char == b'P'):
                     _erase_rec()
-                    self.buff.write("\b \b" * (self._length(buffer) - 1))
+                    self.buff.write("\b \b" * (self._length(buffer)))
                     try:
                         buffer = runexp.command_registry[-(cindex)]
                     except IndexError:
@@ -234,10 +243,13 @@ class InputHandler(object):
         self.buff.flush()
         return buffer
 
-    def _print_colored(self, str, color):        
+    def _print_colored(self, str, color):
         if (rich.print("\\//67", file = io.StringIO())):
+            # color disabled
             self.buff.write(str)
         else:
+            if(str == '\\'):
+                str="\\\\"
             rich.print(f"[{color}]{str}[/{color}]", flush = True, end="")
         
     def _print_rec(self, rec):
@@ -287,6 +299,9 @@ class RunExp(object):
     
     def _argv(self,argv):
         return argv[1:] if len(argv) >= 2 else []
+
+    def prompt(self):
+        return f'(RUNEXP){self.cd}> '
     
     def recomend_cd(self, filtered, command):
         order = []
@@ -369,6 +384,8 @@ class RunExp(object):
         self.freq[cmd] = 1
     
     def exec_from_command(self, command):
+        if(command == '\x00'):
+            return 1
         command_split = self.split_command(command)
         if not(len(command_split)):
             return 1
@@ -384,7 +401,7 @@ class RunExp(object):
         last_ki = 0
         while(isinstance(self.interactive_run,bool)):
             try:
-                command = self.inp.input(f'(RUNEXP){self.cd}> ')
+                command = self.inp.input(self.prompt())
             except (KeyboardInterrupt,EOFError):
                 print("^C")
                 if(last_ki):
@@ -438,8 +455,6 @@ class RunExp(object):
         })
 
     def exec_cd(self, argv, cmd_str):
-        if('.' in cmd_str):
-            warnings.warn('CD might not work using ./ or things with \".\"')
         path = ""
         if(argv == []):
             print(self.cd)
@@ -506,7 +521,10 @@ class RunExp(object):
         type = self.get_exec_type(exec)
 
         if(type == 'EXP'):
-            errno = self.executer(exec, argv,self)
+            try:
+                errno = self.executer(exec, argv,self)
+            except KeyboardInterrupt:
+                errno  = -255
             self.history.append({
                 'string':command_str or 'NORECORD',
                 'type':type,
