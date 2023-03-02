@@ -63,6 +63,17 @@ def main():
         rich.print(HELP)
         return 0
     
+    if(sys.argv[1].lower() == '-a'):
+        for file in os.listdir(af_path()):
+            if not(os.path.isfile(os.path.join(af_path(), file))):
+                continue
+                
+            rich.print(f"Updating [{file[:-3]}]")
+
+            _update(file[:-3])
+
+        sys.exit(0)
+    
     _update(sys.argv[1])
     
 if __name__ == "__main__":
