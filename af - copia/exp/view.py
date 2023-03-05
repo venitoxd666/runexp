@@ -52,8 +52,10 @@ Usage: view FILE
        view hex FILE [-c COLUMN_SPAN[INT]]
        view force_unicode FILE
        view json FILE
+       view PROGRAMMING_LANGUAJE FILE
+       view lib LIB_NAME
 
-Version: 1.1.4
+Version: 1.2.0
 
 Changelog:
     1.0.0: Added basic behaviour for reading and displaying files.
@@ -62,6 +64,27 @@ Changelog:
             1.1.2: Added support for json files.
             1.1.3: Added support for forcing to display as unicode
             1.1.4: Added support for modifing the hex number of columns.
+        1.2.0: Added support for programming language formatting and the lib thing
+
+Examples:
+    view lib logging getLogger
+    --------------------------------------------------------------------------------------------------------
+    Source file at: "C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python310\\lib\\logging\\__init__.py"
+         2070 def getLogger(name=None):
+     #   2071
+     #   2072     Return a logger with the specified name, creating it if necessary.
+     #   2073 
+     #   2074     If no name is specified, return the root logger.
+     #   2075 
+         2076     if not name or isinstance(name, str) and name == root.name:
+         2077         return root
+         2078     return Logger.manager.getLogger(name)
+         2079
+
+Notes:
+    · > view lib module module function 
+      will be always the same as 
+      > view lib module.module.function
 
 """
 
