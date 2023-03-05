@@ -1,6 +1,13 @@
 import rich,builtins
-import os
-import sys
+import os,inspect
+import sys,json
+import importlib
+from rich.syntax import Syntax
+
+
+sys.path.append(
+    os.getcwd()
+)
 
 
 def equals(obj1, obj2):
@@ -60,6 +67,8 @@ Changelog:
 
 COLS = 8
 
+
+
 def hex_view(file):
     if(isinstance(file, str)):
         f = open(file, 'rb')
@@ -108,6 +117,113 @@ def hex_view(file):
     f.close()
     return 0
 
+def print_python(file):
+    f = (open(file, 'r'))
+    
+    rich.print(Syntax(
+        f.read(),
+        'python',
+        line_numbers=True
+    ))
+
+    return 0
+
+
+
+def print_javascript(file):
+    f = (open(file, 'r'))
+    
+    rich.print(Syntax(
+        f.read(),
+        'javascript',
+        line_numbers=True
+    ))
+
+    return 0
+
+def print_c(file):
+    f = (open(file, 'r'))
+    
+    rich.print(Syntax(
+        f.read(),
+        'c',
+        line_numbers=True
+    ))
+
+    return 0
+
+
+def _import_object(obj):
+    obj_list = obj.split('.')
+    module_to_import = obj_list[0]
+    rest = obj_list[1:] if len(obj_list) > 1 else []
+    relative = module_to_import[:]
+    module_to_import = __import__(module_to_import)
+
+    obj = module_to_import
+    for objp in rest:
+        relative += '.' + objp
+        try:
+            obj = getattr(obj, objp)
+        except AttributeError:
+            try:
+                obj = importlib.import_module(relative)
+            except ImportError:
+                rich.print(f"[red]ERROR[/red]: Could not find object {relative}")
+                sys.exit(1)
+
+    return obj
+
+def print_lib(argv):
+    argv = argv[1:] if len(argv) else []
+    if not len(argv):
+        raise IndexError("Expected lib name")
+    lib = '.'.join(argv)
+    object = _import_object(lib)
+
+    if inspect.isbuiltin(object) or (
+        inspect.ismodule(object) and (not(hasattr(object, '__file__')) or
+                                      object.__file__.split('.')[-1] == 'pyd')):
+        rich.print(f"Built-in function or module \"{object}\":[red]/{lib}[/red]")
+        return 0
+
+    rich.print(f"Source file at: \"{inspect.getfile(object)}\".")
+
+    
+    
+    obj = inspect.getsource(object)
+
+    
+    rich.print(Syntax(
+        obj,
+        'python',
+        line_numbers=True,
+        start_line=inspect.getsourcelines(object)[1] - 1 
+    ))
+
+
+def print_json(file):
+    f = (open(file, 'r'))
+    try:
+        rich.print_json(f.read())
+    except json.JSONDecodeError:
+        rich.print(f"[[yellow]WARNING[/yellow]]: view::print_json(\"{file}\") failed, printing as usual")
+        return print_normal(0, file)
+    sys.stdout.write('\n')
+    return 0
+
+def print_normal(hexview, file):
+    if(hexview):
+        return hex_view(file)
+    f = (open(file, 'rb'))
+    try:
+        rich.print(f.read().decode())
+    except Exception:
+        f.seek(0)
+        return hex_view(f)
+    sys.stdout.write('\n')
+
+
 def view(argv):
     global COLS
     hexview = False
@@ -121,20 +237,14 @@ def view(argv):
         rich.print(HELP) 
         return 0
     try:
-        if argv[0] == 'hex':
+        caller = argv[0].lower()
+        
+        if caller == 'hex':
             hexview = True
             file = argv[1]
-        elif(argv[0] == 'json'):
-            file = argv[1]
-            f = (open(file, 'rb'))
-            try:
-                rich.print_json(f.read().decode())
-            except:
-                f.seek(0)
-                return hex_view(f)
-            sys.stdout.write('\n')
-            return 0
-        elif(argv[0] == 'force_unicode'):
+        elif(caller == 'json'):
+            return print_json(argv[1])
+        elif(caller == 'force_unicode'):
             file = argv[1]
             f = (open(file, 'rb'))
             char = f.read(1)
@@ -148,7 +258,7 @@ def view(argv):
 
             rich.print(result)
             return 0
-        elif(argv[0] == 'nocolor'):
+        elif(caller == 'nocolor'):
             file = argv[1]
             f = (open(file, 'r'))
             chunk = f.read(COLS)
@@ -156,22 +266,37 @@ def view(argv):
                 sys.stdout.write(chunk)
                 chunk = f.read(COLS)
             return 0
+        elif(caller == 'python'):
+            return print_python(argv[1])
+
+        elif (caller == 'javascript'):
+            return print_javascript(argv[1])
+
+        elif(caller == 'lib'):
+            return print_lib(argv)
+    
+        elif(caller == 'c' or caller == 'cpp'):
+            return print_c(argv[1])
+    
         else:
+            
             file = argv[0]
+            
+            ext=file.split('.')[-1]
+            if ext == 'py':
+                return print_python(file)
+            elif(ext == 'json'):
+                return print_json(file)
+            elif(ext == 'js'):
+                return print_javascript(file)
+            elif(ext == 'c' or ext == 'h' or ext == 'hpp' or ext == 'cpp'):
+                return print_c(file)
+
 
     except IndexError:
         rich.print(f"[red]ERROR[/red]: Invalid view syntax. Check view -h for help.")
         return 1
-
-    if(hexview):
-        return hex_view(file)
-    f = (open(file, 'rb'))
-    try:
-        rich.print(f.read().decode())
-    except Exception:
-        f.seek(0)
-        return hex_view(f)
-    sys.stdout.write('\n')
+    return print_normal(hexview, file)
 
 if __name__ == '__main__':
     argv=  sys.argv[1:] if len(sys.argv) > 1 else []
