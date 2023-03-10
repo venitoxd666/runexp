@@ -308,6 +308,9 @@ def _print_exps(exps):
         name = f'[{exp.color}]' + max_length(exp.name, NAME_MAX_LENGTH) + f'[/{exp.color}]'
         description = max_length(exp.description, DESCRIPTION_MAX_LENGTH)
         type = f'[{exp.color}]' + max_length(exp.type, TYPE_MAX_LENGTH) + f'[/{exp.color}]'
+        if DESCRIPTION_MAX_LENGTH == 0:        
+            rich.print(" " + name + " | " + type)
+            continue
         rich.print(" " + name + " | " + description + " | " + type)
 
 def display_unique(dr, opts, lscf):
@@ -398,8 +401,6 @@ def main(dir,opts):
     global NAME_MAX_LENGTH, DESCRIPTION_MAX_LENGTH, TYPE_MAX_LENGTH
     listCacheFile = os.path.join(dir, 'data','lcache')
     
-    if opts.reconfig:    
-        return reconfig(dir, opts, listCacheFile)
     if opts.name_length > 0:
         NAME_MAX_LENGTH        = max(opts.name_length,3)
     else:
@@ -413,6 +414,9 @@ def main(dir,opts):
     else:
         TYPE_MAX_LENGTH        = 0
     
+    
+    if opts.reconfig:    
+        return reconfig(dir, opts, listCacheFile)
     
     if not(os.path.exists(listCacheFile)):
         return pre_init(dir,listCacheFile,opts)
