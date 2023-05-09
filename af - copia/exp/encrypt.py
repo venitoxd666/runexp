@@ -65,10 +65,18 @@ encrypter = None
 def get_encrypter():
     return encrypter
 
+def to_bytes(i):
+    if i is None:
+        return b""
+    if isinstance(i, bytes):
+        return i
+
+    return i.to_bytes((i.bit_length() // 8) + (1 if i.bit_length() % 8 else 0), 'big')
+
 def set_encrypter(enc):
     global encrypter
+    encrypter=enc
     return encrypter
-
 
 def _INT_NOT(i, numbits=8):
     return (1 << numbits) - 1 - i
@@ -100,27 +108,30 @@ class Huffman(object):
         if(len(self.psswd) < 10):
             self.encrypter.error("Password too short, massive data loss if password too short. Recomended to write something big", 1)
         self._encrypt = True
-    
-    def process_password(self, password:str):
+        
+    def process_password(self, password:str, recv=10,og_recv=10):
         vector = list(password)
-        res = ""
-        last = None        
+        res = b""
+        last = None
         last_count = 0
+        
         for obj in vector:
+            if isinstance(obj, str):
+                obj = ord(obj)
             if(obj == last):
                 last_count += 1
                 continue
             else:
                 if(last_count >= 1):
-                    res += chr(last_count)
-                res += last if last else ""
+                    res += to_bytes(last_count)
+                res += to_bytes(last)
                 last = obj
                 last_count = 0
         if(last_count > 1):
-            res += chr(last_count)
-        res += last if last else ""
+            res += to_bytes(last_count)
+        res += to_bytes(last)
         last = obj
-        _res =  res.encode()
+        _res = res
         _res += _res[:4] # a little of extra space in the password wich makes it harder to crack
                          # the encoding
         addup = sum(_res)
@@ -134,6 +145,11 @@ class Huffman(object):
                             )
 
         _res += b'\xff'
+        if(sum(_res) % 2 == 0 and (recv > 0)):
+            _res = self.process_password(_res, recv = recv - 1,og_recv=og_recv)
+        elif (recv > 0):
+            _res = self.process_password(_res + _res[1::2] + b'\x01', recv = recv - 2,og_recv=og_recv)
+
         return _res
         
     def get_diagram(self):
@@ -153,14 +169,16 @@ class Huffman(object):
             count += 1
             if(count == len(self.psswd)):
                 count = 0   
-
+            identifier = to_bytes(self.psswd[count])
             # mapping
             if(char in mapping):
                 # already mapped, just add a state to it
-                last.children[self.psswd[count]] = mapping[char]
+                if last.children.get(identifier, None) is not None:
+                    identifier += b"\x01"
+                last.children[identifier] = mapping[char]
                 last = mapping[char]
             else:
-                last = last.add_state(self.psswd[count], char)
+                last = last.add_state(identifier, char)
                 mapping[char] = last
         return root
 
@@ -330,7 +348,21 @@ class Encrypter(object):
         res = io.BytesIO()
         char = read_buffer.read(1)
         while(char):
-            res.write(int.to_bytes(_INT_NOT(char[0]), 1, 'big'))
+            """
+            char*chr;
+            while(1){
+                if (fileRead(readFileBuffer, chr)) { // eof
+                    break;
+                }
+                fileWrite(outFileBuffer,(char*)(~(*chr)));
+            }
+            
+            """
+            res.write(int.to_bytes(_INT_NOT(
+                char[0]),
+                1,
+                'big'
+            ))
             char = read_buffer.read(1)
         return res
     
@@ -421,7 +453,7 @@ class Encrypter(object):
                     return
                 output_buffer = method(file)
             except Exception as e:
-                self.error(f"Invalid method: {method}",1)
+                self.error(f"Invalid method: {method} (errmsg:{str(e)})", 1)
             file.close()
             if(stop()):
                 return

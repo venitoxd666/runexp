@@ -256,7 +256,12 @@ class InputHandler(object):
         if (rich.print("\\//67", file = io.StringIO())):
             self.buff.write(rec.upper())
         else:
-            rich.print(f"[grey35]{rec}[/grey35]", end = "", flush = True)
+            for char in rec:
+                if char == '\\':                
+                    rich.print(f"[grey35]{char + char}[/grey35]", end = "", flush = True)
+                    continue
+                rich.print(f"[grey35]{char}[/grey35]", end = "", flush = True)
+
 
 def _decode_input(password_input, cache = {}):
     def _(res):
@@ -395,7 +400,6 @@ class RunExp(object):
     
         self.execute_command(command_split,command_split,command)
         return 0
-        
     
     def interactive(self):
         last_ki = 0
@@ -495,8 +499,8 @@ class RunExp(object):
             rich.print(RUNEXP_HELP[1:])
             return 0
         
-        if(a[0] == 'debug' and argc == 1):
-            self.debug = True
+        if(a[0] == 'dbg' and argc == 0):
+            self.debug = ~self.debug
             return 0
     
         if(a[0] == '--isexp'):
@@ -535,13 +539,34 @@ class RunExp(object):
 
             if(exec == 'cd'):
                 return self.exec_cd(argv, command_str)
+            if(exec == 'mcdstr'):
+                dir=' '.join(a[1:])
+                if dir == '':
+                    self.history.append({'type':'CMD', 'string':command_str or 'NORECORD', 'errno':-255})
+                    return -255
+                exists = os.path.exists(dir) and os.path.isdir(dir)              
+                self.history.append({'type':'CMD', 'string':command_str or 'NORECORD', 'errno':~exists})
+                if self.debug:
+                    print(f"mcdstr \"{dir}\" : CD \x7b{self.cd},", end = " ")
+                if exists:
+                    self.cd = dir
+                if self.debug:
+                    rich.print(f"{self.cd}\x7d")
+                return 0
             if(exec == ''):
                 return 0
+            runexp_appended = os.path.join(self.cd,'.runexp')
+            if (os.path.exists(runexp_appended) and os.path.isdir(runexp_appended)):
+                exists_file = os.path.join(runexp_appended, exec + '.py')
+                if os.path.exists(exists_file):
+                    full_argv = ['python',os.path.join(self.af_path(), 'exc_rcp.py'), exists_file]
+                if self.debug:
+                    print(f"Running from /.runexp/{exec}")
 
             full_argv.extend(argv)
 
             if(self.debug):
-                print("Final Execution:",full_argv)
+                print("Final Execution: Popen(",full_argv, f", cwd = \"{self.cd}\", stdout = sys.stdout, shell = True)")
             try:
                 popen = subprocess.Popen(
                     full_argv, cwd=self.cd,stdout = sys.stdout,shell=True
@@ -572,12 +597,23 @@ class RunExp(object):
         res = []
         curr = ""
         in_coutes = False
+        last_backspace = False
         for c in cmd:
+
+            if(last_backspace):
+                curr += "\\"+c
+                last_backspace = False
+                continue
+            
             if(in_coutes):
                 if(c=="\""):
                     in_coutes = False
                     continue
                 curr += c
+                continue
+
+            if (c == '\\'):
+                last_backspace = True
                 continue
             
             if(c=="\""):

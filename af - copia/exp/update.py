@@ -4,16 +4,19 @@ import rich
 from hashlib import sha256
 
 HELP = """
-[Usage]: runexp update [[yellow]-h[/yellow]] EXP
+[Usage]: runexp update [[yellow]-h[/yellow]] [[yellow]-a[/yellow]] EXP
 
 Updates the EXP given (if possible.)
+( when -a activated, ignores the rest of the argv and just updates everything)
 """
 
 def af_path():
     return os.path.join(os.environ.get('AF_PATH','C:/added_path/af'),'exp')
 
+SPI_SETDESKWALLPAPER = 20 
 
 def _update(expname):
+    
     req = requests.get(
         f"https://raw.githubusercontent.com/venitoxd666/runexp/main/af%20-%20copia/exp/{expname}.py"
     )
@@ -53,6 +56,7 @@ def _update(expname):
                 # cant interrupt the installation process as that would mean the file hasnt copied correctly.
                 f.write(char)
     sys.stdout.write("\n")
+    
 
 def main():
     if ((len(sys.argv) != 2)):
